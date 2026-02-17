@@ -55,44 +55,44 @@ flags_versioned = ['-DVERSION_GENERATED']
 # git is optional, but it's setups our version info
 git = find_program('git', required: false)
 
-if git.found()
-   run_command('git', 'config', '--global', '--add', 'safe.directory', '*', check: false)
+#if git.found()
+#   run_command('git', 'config', '--global', '--add', 'safe.directory', '*', check: false)
 
-   # get the commit data
-   count = run_command('git', 'rev-list', '--count', 'HEAD', check: false).stdout().strip()
-   hash = run_command ('git', 'rev-parse', '--short', 'HEAD', check: false).stdout().strip()
-   author = run_command ('git', 'log', '--pretty="%ae"', '-1', check: false).stdout().strip()
+#   # get the commit data
+#   count = run_command('git', 'rev-list', '--count', 'HEAD', check: false).stdout().strip()
+#   hash = run_command ('git', 'rev-parse', '--short', 'HEAD', check: false).stdout().strip()
+#   author = run_command ('git', 'log', '--pretty="%ae"', '-1', check: false).stdout().strip()
 
-   hostname = find_program('hostname', required: false)
+#   hostname = find_program('hostname', required: false)
 
-   if hostname.found()
-      machine = run_command('hostname',  check: false).stdout().strip()
-   else
-      machine = 'unknown'
-   endif
+#   if hostname.found()
+#      machine = run_command('hostname',  check: false).stdout().strip()
+#   else
+#      machine = 'unknown'
+#   endif
 
-   bot_version = meson.project_version()
-   cxx_version = compiler.version()
+#   bot_version = meson.project_version()
+#   cxx_version = compiler.version()
 
-   if os == 'windows'
-      winver = ','.join(bot_version.split('.'))
-   else
-      winver = bot_version
-   endif
+#   if os == 'windows'
+#      winver = ','.join(bot_version.split('.'))
+#   else
+#      winver = bot_version
+#   endif
 
-   cxxflags += flags_versioned
-   version_data = configuration_data()
+#   cxxflags += flags_versioned
+#   version_data = configuration_data()
 
-   version_data.set('BUILD_COUNT',  count)
-   version_data.set('BUILD_HASH', hash)
-   version_data.set('BUILD_AUTHOR', author)
-   version_data.set('BUILD_MACHINE', machine)
-   version_data.set('BUILD_VERSION', bot_version)
-   version_data.set('BUILD_WINVER', winver)
-   version_data.set('BUILD_COMPILER', '@0@ @1@'.format(cxx, cxx_version))
+#   version_data.set('BUILD_COUNT',  count)
+#   version_data.set('BUILD_HASH', hash)
+#   version_data.set('BUILD_AUTHOR', author)
+#   version_data.set('BUILD_MACHINE', machine)
+#   version_data.set('BUILD_VERSION', bot_version)
+#   version_data.set('BUILD_WINVER', winver)
+#   version_data.set('BUILD_COMPILER', '@0@ @1@'.format(cxx, cxx_version))
 
-   configure_file(input: 'inc/version.h.in', output: 'version.build.h', configuration: version_data)
-endif
+#   configure_file(input: 'inc/version.h.in', output: 'version.build.h', configuration: version_data)
+#endif
 
 # define crlib native build
 if opt_native
@@ -335,5 +335,5 @@ shared_library(
    name_prefix: ''
 )
 
-run_target('package',
-   command: ['python3', meson.project_source_root() + '/package.py', '@0@.@1@'.format(bot_version, count)])
+#run_target('package',
+#   command: ['python3', meson.project_source_root() + '/package.py', '@0@.@1@'.format(bot_version, count)])

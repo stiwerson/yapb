@@ -22,6 +22,9 @@ class BotManager final : public Singleton <BotManager> {
 public:
    using ForEachBot = const Lambda <bool (Bot *)> &;
    using UniqueBot = UniquePtr <Bot>;
+   
+   cr::HashMap<String, cr::Array<String>> m_replyBuffer; // all bots replies HashMap
+   StringArray m_globalRandomChatBuffer;
 
 private:
    float m_difficultyBalanceTime {}; // time to balance difficulties ?

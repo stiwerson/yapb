@@ -70,6 +70,7 @@ BotManager::BotManager () {
    reset ();
 
    m_addRequests.clear ();
+   m_replyBuffer.clear ();
    m_killerEntity = nullptr;
 
    initFilters ();
@@ -1197,7 +1198,7 @@ Bot::Bot (edict_t *bot, int difficulty, int personality, int team, int skin) {
    }
 
    // assign how talkative this bot will be
-   m_sayTextBuffer.chatDelay = rg (3.8f, 10.0f);
+   m_sayTextBuffer.chatDelay = rg (3.8f, 8.0f);
    m_sayTextBuffer.chatProbability = rg (10, 100);
 
    m_isAlive = false;

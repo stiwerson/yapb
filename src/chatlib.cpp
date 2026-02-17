@@ -9,6 +9,12 @@
 
 ConVar cv_chat ("chat", "1", "Enables or disables bot chat functionality.");
 ConVar cv_chat_percent ("chat_percent", "30", "Bot's chance to send random dead chat when killed.", true, 0.0f, 100.0f);
+ConVar cv_chat_humanize ("chat_humanize", "0", "Enables or disables intentional chat 'humanization' (typos, missing letters, lowercase, etc.)");
+ConVar cv_chat_delay_min ("chat_delay_min", "4.0", "Minimum wait for bots send a message text.", true, 0.0f, 60.0f);
+ConVar cv_chat_delay_max ("chat_delay_max", "10.0", "Maximum wait for bots send a message text.", true, 0.0f, 60.0f);
+ConVar cv_chat_global_cd_min ("chat_global_cd_min", "3.0", "Minimum global cooldown between any bot chat messages (seconds).", true, 0.0f, 60.0f);
+ConVar cv_chat_global_cd_max ("chat_global_cd_max", "8.0", "Maximum global cooldown between any bot chat messages (seconds).", true, 0.0f, 60.0f);
+ConVar cv_chat_recent_buffer_size ("chat_recent_buffer_size", "20", "How many recent chat messages to remember to avoid repetitions (0 = disable).", true, 0, 200);
 
 BotChatManager::BotChatManager () {
    m_clanTags = {
@@ -42,7 +48,7 @@ void BotChatManager::stripTags (String &line) {
 }
 
 void BotChatManager::humanizePlayerName (String &playerName) {
-   if (playerName.empty ()) {
+   if (playerName.empty () || !cv_chat_humanize.as<int> ()) {
       return;
    }
 
@@ -61,6 +67,10 @@ void BotChatManager::humanizePlayerName (String &playerName) {
 }
 
 void BotChatManager::addChatErrors (String &line) {
+   if (!cv_chat_humanize.as<int> ()) {
+      return;
+   }
+
    // sometimes switch name to lower characters, only valid for the english languge
    if (rg.chance (8) && cv_language.as <StringRef> () == "en") {
       line.lowercase ();
@@ -98,9 +108,11 @@ bool BotChatManager::checkKeywords (StringRef line, String &reply) {
          if (line.find (keyword) != String::InvalidIndex) {
             auto &usedReplies = factory.usedReplies;
 
-            if (usedReplies.length () >= factory.replies.length () / 4) {
+            if (usedReplies.length () >= factory.replies.length () / 2) {
                usedReplies.clear ();
             }
+
+            cr::Array<String> &usedRepliesGlobal = bots.m_replyBuffer[keyword];
 
             if (!factory.replies.empty ()) {
                bool replyUsed = false;
@@ -114,10 +126,23 @@ bool BotChatManager::checkKeywords (StringRef line, String &reply) {
                   }
                }
 
+               // don't say this if other bot already said.
+               if (!replyUsed) {
+                  auto &globalUsed = bots.m_replyBuffer[keyword];
+                  for (auto &g : globalUsed) {
+                     if (g == choosenReply) { replyUsed = true; break; }
+                  }
+               }
+
                // reply not used, so use it
                if (!replyUsed) {
                   reply.assign (choosenReply); // update final buffer
                   usedReplies.push (choosenReply); // add to ignore list
+                  usedRepliesGlobal.push(choosenReply); //add to avoid globally list
+
+                  if(usedRepliesGlobal.length() >= factory.replies.length()){
+                     usedRepliesGlobal.clear();
+                  }
 
                   return true;
                }
@@ -323,16 +348,19 @@ bool Bot::isReplyingToChat () {
 
    if (m_sayTextBuffer.entityIndex != -1 && !m_sayTextBuffer.sayText.empty ()) {
       // check is time to chat is good
-      if (m_sayTextBuffer.timeNextChat < game.time () + rg (m_sayTextBuffer.chatDelay / 2, m_sayTextBuffer.chatDelay)) {
+      if (m_sayTextBuffer.timeNextChat < game.time () + rg (m_sayTextBuffer.chatDelay / 2, m_sayTextBuffer.chatDelay) 
+         && m_lastChatTime + rg (cv_chat_delay_min.as <float> (), cv_chat_delay_max.as <float> ()) < game.time ()
+         && bots.getLastChatTimestamp () + rg (cv_chat_global_cd_min.as <float> (), cv_chat_global_cd_max.as <float> ()) < game.time ()) {
          String replyText {};
 
-         if (rg.chance (m_sayTextBuffer.chatProbability + rg (40, 70)) && checkChatKeywords (replyText)) {
+         if (rg.chance (m_sayTextBuffer.chatProbability + rg (50, 90)) && checkChatKeywords (replyText)) {
             prepareChatMessage (replyText);
             pushMsgQueue (BotMsg::Say);
 
             m_sayTextBuffer.entityIndex = -1;
             m_sayTextBuffer.timeNextChat = game.time () + m_sayTextBuffer.chatDelay;
             m_sayTextBuffer.sayText.clear ();
+            m_lastChatTime = game.time();
 
             return true;
          }
@@ -349,11 +377,11 @@ void Bot::checkForChat () {
    if (m_isAlive || !cv_chat || game.is (GameFlags::CSDM)) {
       return;
    }
-
+   
    // bot chatting turned on?
    if (rg.chance (cv_chat_percent.as <int> ())
-      && m_lastChatTime + rg (6.0f, 10.0f) < game.time ()
-      && bots.getLastChatTimestamp () + rg (2.5f, 5.0f) < game.time ()
+      && m_lastChatTime + rg (cv_chat_delay_min.as <float> (), cv_chat_delay_max.as <float> ()) < game.time ()
+      && bots.getLastChatTimestamp () + rg (cv_chat_global_cd_min.as <float> (), cv_chat_global_cd_max.as <float> ()) < game.time ()
       && !isReplyingToChat ()) {
 
       if (conf.hasChatBank (Chat::Dead)) {
@@ -362,9 +390,24 @@ void Bot::checkForChat () {
 
          // search for last messages, sayed
          for (auto &sentence : m_sayTextBuffer.lastUsedSentences) {
-            if (phrase.startsWith (sentence)) {
+            if (phrase == StringRef(sentence)) {
                sayBufferExists = true;
                break;
+            }
+         }
+
+         // Check if other bot already said that
+         if (!sayBufferExists) {
+            bool globalUsed = false;
+            for (auto &globalSentence : bots.m_globalRandomChatBuffer) {
+               if (phrase == StringRef(globalSentence)) {
+                  globalUsed = true;
+                  break;
+               }
+            }
+
+            if (globalUsed) {
+               sayBufferExists = true;
             }
          }
 
@@ -377,12 +420,16 @@ void Bot::checkForChat () {
 
             // add to ignore list
             m_sayTextBuffer.lastUsedSentences.push (phrase);
+            bots.m_globalRandomChatBuffer.push (phrase);
          }
       }
 
       // clear the used line buffer every now and then
-      if (static_cast <int> (m_sayTextBuffer.lastUsedSentences.length ()) > rg (4, 6)) {
+      if (static_cast <int> (m_sayTextBuffer.lastUsedSentences.length ()) > rg(10, 12)) {
          m_sayTextBuffer.lastUsedSentences.clear ();
+      }
+      if (static_cast <int> (bots.m_globalRandomChatBuffer.length ()) > cv_chat_recent_buffer_size.as <int> ()) {
+         bots.m_globalRandomChatBuffer.erase(0,1);
       }
    }
 }
