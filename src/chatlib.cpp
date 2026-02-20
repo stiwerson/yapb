@@ -94,6 +94,21 @@ void BotChatManager::addChatErrors (String &line) {
    }
 }
 
+void BotChatManager::removeAccents(String &text) {
+   //Nomalize a text by removing accents
+   static const char from[] = "ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇç";
+   static const char to[]   = "AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCc";
+
+   for (size_t i = 0; i < text.length(); i++) {
+      for (size_t j = 0; j < sizeof(from) - 1; j++) {
+            if (text[i] == from[j]) {
+            text[i] = to[j];
+            break;
+         }
+      }
+    }
+}
+
 bool BotChatManager::checkKeywords (StringRef line, String &reply) {
    // this function checks is string contain keyword, and generates reply to it
 
@@ -102,7 +117,9 @@ bool BotChatManager::checkKeywords (StringRef line, String &reply) {
    }
 
    for (auto &factory : conf.getReplies ()) {
-      for (const auto &keyword : factory.keywords) {
+      for (auto &keyword : factory.keywords) {
+
+         removeAccents(keyword);
 
          // check is keyword has occurred in message
          if (line.find (keyword) != String::InvalidIndex) {

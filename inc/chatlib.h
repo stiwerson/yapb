@@ -58,6 +58,9 @@ public:
 
    // chat helper to find keywords for given string
    bool checkKeywords (StringRef line, String &reply);
+
+   // Remove accents in latin words so checkKeywords can work properly in words with accent.
+   void removeAccents(String &text);
 };
 
 // expose global
