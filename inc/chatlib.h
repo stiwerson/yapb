@@ -60,7 +60,7 @@ public:
    bool checkKeywords (StringRef line, String &reply);
 
    // Remove accents in latin words so checkKeywords can work properly in words with accent.
-   void removeAccents(String &text);
+   static void removeAccents(String &text);
 };
 
 // expose global

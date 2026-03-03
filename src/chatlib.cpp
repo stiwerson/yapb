@@ -94,19 +94,68 @@ void BotChatManager::addChatErrors (String &line) {
    }
 }
 
-void BotChatManager::removeAccents(String &text) {
-   //Nomalize a text by removing accents
-   static const char from[] = "ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇç";
-   static const char to[]   = "AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCc";
+void BotChatManager::removeAccents (String &text) {
+   // remove accents from words for checking replies
+   // usually used in non english languages. (Spanish and Portuguese for example)
 
-   for (size_t i = 0; i < text.length(); i++) {
-      for (size_t j = 0; j < sizeof(from) - 1; j++) {
-            if (text[i] == from[j]) {
-            text[i] = to[j];
-            break;
-         }
-      }
-    }
+   static const struct { const char *from; const char to; } table[] = {
+      { "\xC3\x81", 'A' }, // Á
+      { "\xC3\x80", 'A' }, // À
+      { "\xC3\x83", 'A' }, // Ã
+      { "\xC3\x82", 'A' }, // Â
+      { "\xC3\x84", 'A' }, // Ä
+      { "\xC3\xA1", 'a' }, // á
+      { "\xC3\xA0", 'a' }, // à
+      { "\xC3\xA3", 'a' }, // ã
+      { "\xC3\xA2", 'a' }, // â
+      { "\xC3\xA4", 'a' }, // ä
+      { "\xC3\x89", 'E' }, // É
+      { "\xC3\x88", 'E' }, // È
+      { "\xC3\x8A", 'E' }, // Ê
+      { "\xC3\x8B", 'E' }, // Ë
+      { "\xC3\xA9", 'e' }, // é
+      { "\xC3\xA8", 'e' }, // è
+      { "\xC3\xAA", 'e' }, // ê
+      { "\xC3\xAB", 'e' }, // ë
+      { "\xC3\x8D", 'I' }, // Í
+      { "\xC3\x8C", 'I' }, // Ì
+      { "\xC3\x8E", 'I' }, // Î
+      { "\xC3\x8F", 'I' }, // Ï
+      { "\xC3\xAD", 'i' }, // í
+      { "\xC3\xAC", 'i' }, // ì
+      { "\xC3\xAE", 'i' }, // î
+      { "\xC3\xAF", 'i' }, // ï
+      { "\xC3\x93", 'O' }, // Ó
+      { "\xC3\x92", 'O' }, // Ò
+      { "\xC3\x95", 'O' }, // Õ
+      { "\xC3\x94", 'O' }, // Ô
+      { "\xC3\x96", 'O' }, // Ö
+      { "\xC3\xB3", 'o' }, // ó
+      { "\xC3\xB2", 'o' }, // ò
+      { "\xC3\xB5", 'o' }, // õ
+      { "\xC3\xB4", 'o' }, // ô
+      { "\xC3\xB6", 'o' }, // ö
+      { "\xC3\x9A", 'U' }, // Ú
+      { "\xC3\x99", 'U' }, // Ù
+      { "\xC3\x9B", 'U' }, // Û
+      { "\xC3\x9C", 'U' }, // Ü
+      { "\xC3\xBA", 'u' }, // ú
+      { "\xC3\xB9", 'u' }, // ù
+      { "\xC3\xBB", 'u' }, // û
+      { "\xC3\xBC", 'u' }, // ü
+      { "\xC3\x87", 'C' }, // Ç
+      { "\xC3\xA7", 'c' }, // ç
+      { "\xC3\x91", 'N' }, // Ñ
+      { "\xC3\xB1", 'n' }, // ñ
+      { "\xC3\x9D", 'Y' }, // Ý
+      { "\xC3\xBD", 'y' }, // ý
+      { nullptr, 0 }
+   };
+
+   for (int i = 0; table[i].from != nullptr; ++i) {
+      char buf[2] = { table[i].to, '\0' };
+      text.replace (table[i].from, buf);
+   }
 }
 
 bool BotChatManager::checkKeywords (StringRef line, String &reply) {
@@ -119,10 +168,11 @@ bool BotChatManager::checkKeywords (StringRef line, String &reply) {
    for (auto &factory : conf.getReplies ()) {
       for (auto &keyword : factory.keywords) {
 
-         removeAccents(keyword);
+         String normalizedKeyword = keyword;
+         removeAccents(normalizedKeyword);
 
          // check is keyword has occurred in message
-         if (line.find (keyword) != String::InvalidIndex) {
+         if (line.find (normalizedKeyword) != String::InvalidIndex) {
             auto &usedReplies = factory.usedReplies;
 
             if (usedReplies.length () >= factory.replies.length () / 2) {
@@ -357,7 +407,11 @@ void Bot::prepareChatMessage (StringRef message) {
 bool Bot::checkChatKeywords (String &reply) {
    // this function parse chat buffer, and prepare buffer to keyword searching
 
-   return chatlib.checkKeywords (utf8tools.strToUpper (m_sayTextBuffer.sayText), reply);
+   // remove accents from latin words
+   String normalized = m_sayTextBuffer.sayText;
+   BotChatManager::removeAccents (normalized);
+
+   return chatlib.checkKeywords (utf8tools.strToUpper (normalized), reply);
 }
 
 bool Bot::isReplyingToChat () {
