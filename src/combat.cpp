@@ -1364,7 +1364,7 @@ bool Bot::isWeaponBadAtDistance (int weaponIndex, float distance) {
 }
 
 void Bot::focusEnemy () {
-   if (game.isNullEntity (m_enemy)) {
+   if (game.isNullEntity (m_enemy) || m_blindTime > game.time ()) {
       return;
    }
 

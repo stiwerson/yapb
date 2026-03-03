@@ -3736,7 +3736,7 @@ void Bot::takeBlind (int alpha) {
    if (gameState.getRoundStartTime () + 5.0f < game.time ()) {
       m_viewDistance = m_maxViewDistance;
    }
-   m_blindTime = game.time () + static_cast <float> (alpha - 200) / 16.0f;
+   m_blindTime = game.time () + static_cast <float> (alpha - 130) / 16.0f;
 
    if (m_blindTime < game.time ()) {
       return;
