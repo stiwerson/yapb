@@ -497,7 +497,7 @@ void Bot::checkForChat () {
 
       // clear the used line buffer every now and then
       if (static_cast <int> (m_sayTextBuffer.lastUsedSentences.length ()) > rg(10, 12)) {
-         m_sayTextBuffer.lastUsedSentences.clear ();
+         m_sayTextBuffer.lastUsedSentences.erase (0,1);
       }
       if (static_cast <int> (bots.m_globalRandomChatBuffer.length ()) > cv_chat_recent_buffer_size.as <int> ()) {
          bots.m_globalRandomChatBuffer.erase(0,1);

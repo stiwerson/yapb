@@ -260,62 +260,51 @@ void Bot::checkBreakablesAround () {
 }
 
 edict_t *Bot::lookupBreakable () {
-   // this function checks if bot is blocked by a shoot able breakable in his moving direction
+   // PODBot-style: trace na direção do destino, se bater em algo com takedamage, atira
+   
+   if (game.isNullEntity (m_enemy) && !isOnLadder ()) {
+      const float dist = usesKnife () ? 32.0f : 80.0f;
 
-   // we're got something already
-   if (game.isBreakableEntity (m_breakableEntity)) {
-      return m_breakableEntity;
-   }
-   const float detectBreakableDistance = (usesKnife () || isOnLadder ()) ? 32.0f : rg (72.0f, 256.0f);
+      auto doTrace = [&] (const Vector &start) -> edict_t * {
+         TraceResult tr {};
+         const auto dir = (m_destOrigin - start).normalize_apx ();
+         game.testLine (start, start + dir * dist, TraceIgnore::None, ent (), &tr);
 
-   auto doLookup = [&] (const Vector &start, const Vector &end, const float dist) -> edict_t * {
-      TraceResult tr {};
-      game.testLine (start, start + (end - start).normalize_apx () * dist, TraceIgnore::None, ent (), &tr);
+         if (!cr::fequal (tr.flFraction, 1.0f) && !game.isNullEntity (tr.pHit)) {
+            auto hit = tr.pHit;
 
-      if (!cr::fequal (tr.flFraction, 1.0f)) {
-         auto hit = tr.pHit;
+            // qualquer entidade que toma dano, nao é player, nao é worldspawn
+            if (hit != game.getStartEntity ()
+               && !(hit->v.flags & (FL_CLIENT | FL_FAKECLIENT | FL_MONSTER))
+               && hit->v.takedamage > 0.0f
+               && hit->v.health > 0.0f
+               && hit->v.health < 500.0f) {
 
-         // check if this isn't a triggered (bomb) breakable and if it takes damage. if true, shoot the crap!
-         if (game.isBreakableEntity (hit)) {
-            m_breakableOrigin = game.getEntityOrigin (hit);
-            m_breakableEntity = hit;
-
-            return hit;
+               // checa se nao ta na lista de ignorados
+               for (const auto &ignored : m_ignoredBreakable) {
+                  if (ignored == hit) {
+                     return nullptr;
+                  }
+               }
+               m_breakableOrigin = tr.vecEndPos;
+               m_breakableEntity = hit;
+               return hit;
+            }
          }
-      }
-      return nullptr;
-   };
+         return nullptr;
+      };
 
-   auto isGoodForUs = [&] (edict_t *ent) -> bool {
-      if (game.isNullEntity (ent)) {
-         return false;
-      }
+      // trace do chao (origin) igual PODBot
+      auto hit = doTrace (pev->origin);
+      if (hit) return hit;
 
-      // check breakable team, needed for some plugins
-      if (ent->v.team > 0 && ent->v.team != game.getPlayerTeamGame (this->ent ())) {
-         return false;
-      }
-
-      for (const auto &br : m_ignoredBreakable) {
-         if (br == ent) {
-            return false;
-         }
-      }
-      return true;
-   };
-   auto hit = doLookup (pev->origin, m_destOrigin, detectBreakableDistance);
-
-   if (isGoodForUs (hit)) {
-      return hit;
+      // trace dos olhos igual PODBot
+      hit = doTrace (getEyesPos ());
+      if (hit) return hit;
    }
-   hit = doLookup (getEyesPos (), m_destOrigin, detectBreakableDistance);
 
-   if (isGoodForUs (hit)) {
-      return hit;
-   }
    m_breakableEntity = nullptr;
    m_breakableOrigin.clear ();
-
    return nullptr;
 }
 
@@ -3843,6 +3832,29 @@ void Bot::updatePracticeDamage (edict_t *attacker, int damage) {
 
 void Bot::pushChatMessage (int type, bool isTeamSay) {
    if (!conf.hasChatBank (type) || !cv_chat) {
+      return;
+   }
+
+   // check global buffer to avoid bots repeating the same greeting (reusing the same as random chat)
+   if (type == Chat::Hello) {
+      StringRef phrase = conf.pickRandomFromChatBank (type);
+      bool alreadyUsed = false;
+
+      for (auto &sentence : bots.m_globalRandomChatBuffer) {
+         if (phrase == StringRef (sentence)) {
+            alreadyUsed = true;
+            break;
+         }
+      }
+
+      if (alreadyUsed) {
+         return;
+      }
+
+      prepareChatMessage (phrase);
+      pushMsgQueue (isTeamSay ? BotMsg::SayTeam : BotMsg::Say);
+
+      bots.m_globalRandomChatBuffer.push (phrase);
       return;
    }
 
