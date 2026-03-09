@@ -421,10 +421,11 @@ bool Bot::isReplyingToChat () {
       // check is time to chat is good
       if (m_sayTextBuffer.timeNextChat < game.time () + rg (m_sayTextBuffer.chatDelay / 2, m_sayTextBuffer.chatDelay) 
          && m_lastChatTime + rg (cv_chat_delay_min.as <float> (), cv_chat_delay_max.as <float> ()) < game.time ()
-         && bots.getLastChatTimestamp () + rg (cv_chat_global_cd_min.as <float> (), cv_chat_global_cd_max.as <float> ()) < game.time ()) {
+         && bots.getLastChatTimestamp () + rg (cv_chat_global_cd_min.as <float> (), cv_chat_global_cd_max.as <float> ()) < game.time ()
+         ) {
          String replyText {};
 
-         if (rg.chance (m_sayTextBuffer.chatProbability + rg (50, 90)) && checkChatKeywords (replyText)) {
+         if (rg.chance (m_sayTextBuffer.chatProbability + rg (40, 80)) && checkChatKeywords (replyText)) {
             prepareChatMessage (replyText);
             pushMsgQueue (BotMsg::Say);
 
@@ -432,6 +433,7 @@ bool Bot::isReplyingToChat () {
             m_sayTextBuffer.timeNextChat = game.time () + m_sayTextBuffer.chatDelay;
             m_sayTextBuffer.sayText.clear ();
             m_lastChatTime = game.time();
+            bots.setLastChatTimestamp(game.time ());
 
             return true;
          }
