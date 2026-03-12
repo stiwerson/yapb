@@ -450,12 +450,15 @@ void Bot::checkForChat () {
    if (m_isAlive || !cv_chat || game.is (GameFlags::CSDM)) {
       return;
    }
+
+   if(isReplyingToChat()){
+      return;
+   }
    
    // bot chatting turned on?
    if (rg.chance (cv_chat_percent.as <int> ())
       && m_lastChatTime + rg (cv_chat_delay_min.as <float> (), cv_chat_delay_max.as <float> ()) < game.time ()
-      && bots.getLastChatTimestamp () + rg (cv_chat_global_cd_min.as <float> (), cv_chat_global_cd_max.as <float> ()) < game.time ()
-      && !isReplyingToChat ()) {
+      && bots.getLastChatTimestamp () + rg (cv_chat_global_cd_min.as <float> (), cv_chat_global_cd_max.as <float> ()) < game.time ()) {
 
       if (conf.hasChatBank (Chat::Dead)) {
          StringRef phrase = conf.pickRandomFromChatBank (Chat::Dead);
